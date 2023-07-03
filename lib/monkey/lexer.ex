@@ -9,23 +9,30 @@ defmodule Monkey.Lexer do
     "return" => :return
   }
 
+  @letters [?a..?z, ?A..?Z, '_']
+           |> Enum.flat_map(&Enum.to_list/1)
+           |> Enum.map(&to_string([&1]))
+
+  @digits ?0..?9
+          |> Enum.map(&to_string([&1]))
+
   def stream_tokens(input) do
     Stream.resource(
-      fn -> input end,
+      fn -> String.graphemes(input) end,
       &next_token/1,
       &Function.identity/1
     )
   end
 
   # Skip whitespace
-  defp next_token(<<" ", rest::binary>>), do: {[], rest}
-  defp next_token(<<"\t", rest::binary>>), do: {[], rest}
-  defp next_token(<<"\r", rest::binary>>), do: {[], rest}
-  defp next_token(<<"\n", rest::binary>>), do: {[], rest}
+  defp next_token([" " | rest]), do: {[], rest}
+  defp next_token(["\t" | rest]), do: {[], rest}
+  defp next_token(["\r" | rest]), do: {[], rest}
+  defp next_token(["\n" | rest]), do: {[], rest}
 
   # Two-character operators
-  defp next_token(<<"==", rest::binary>>), do: {[{:eq, "=="}], rest}
-  defp next_token(<<"!=", rest::binary>>), do: {[{:not_eq, "!="}], rest}
+  defp next_token(["=", "=" | rest]), do: {[{:eq, "=="}], rest}
+  defp next_token(["!", "=" | rest]), do: {[{:not_eq, "!="}], rest}
 
   # Single-character operators
   for {name, char} <- [
@@ -44,25 +51,23 @@ defmodule Monkey.Lexer do
         comma: ",",
         semicolon: ";"
       ] do
-    defp next_token(<<unquote(char), rest::binary>>), do: {[{unquote(name), unquote(char)}], rest}
+    defp next_token([unquote(char) | rest]), do: {[{unquote(name), unquote(char)}], rest}
   end
 
-  defguardp is_letter_char(char) when char in ?a..?z or char in ?A..?Z or char == '_'
-  defguardp is_number_char(char) when char in ?0..?9
-
   # Identifiers
-  defp next_token(<<char, _::binary>> = string) when is_letter_char(char) do
-    [identifier] = Regex.run(~r/[a-zA-Z_]+/, string)
-    {_, rest} = String.split_at(string, String.length(identifier))
+  defp next_token([char | _] = chars) when char in @letters do
+    {identifier, rest} = Enum.split_while(chars, &(&1 in @letters))
+    identifier = Enum.join(identifier)
 
     type = @keywords[identifier] || :ident
 
     {[{type, identifier}], rest}
   end
 
-  defp next_token(<<char, _::binary>> = string) when is_number_char(char) do
-    [int] = Regex.run(~r/[0-9]+/, string)
-    {_, rest} = String.split_at(string, String.length(int))
+  # Integers
+  defp next_token([char | _] = chars) when char in @digits do
+    {int, rest} = Enum.split_while(chars, &(&1 in @digits))
+    int = Enum.join(int)
 
     {[{:int, int}], rest}
   end
@@ -71,7 +76,7 @@ defmodule Monkey.Lexer do
     {[{:illegal, char}], rest}
   end
 
-  defp next_token("") do
+  defp next_token([]) do
     {[{:eof, ""}], :done}
   end
 
