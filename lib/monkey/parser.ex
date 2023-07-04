@@ -75,11 +75,8 @@ defmodule Monkey.Parser do
   end
 
   defp parse_expression(parser, precedence \\ :lowest) do
-    with {:ok, exp, parser} <- parse_prefix_expression(parser, Token.type(parser.cur_token)) do
-      {exp, parser}
-    else
-      :error -> {nil, parser}
-    end
+    {exp, parser} = parse_prefix_expression(parser, Token.type(parser.cur_token))
+    {exp, parser}
   end
 
   # Temporary until we can parse expressions
@@ -116,7 +113,6 @@ defmodule Monkey.Parser do
   # identifiers
   defp parse_prefix_expression(parser, :ident) do
     {
-      :ok,
       %AST.Identifier{token: parser.cur_token, value: Token.literal(parser.cur_token)},
       parser
     }
@@ -127,7 +123,6 @@ defmodule Monkey.Parser do
     case parser.cur_token |> Token.literal() |> Integer.parse() do
       {int, _} ->
         {
-          :ok,
           %AST.IntegerLiteral{
             token: parser.cur_token,
             value: int
@@ -136,8 +131,7 @@ defmodule Monkey.Parser do
         }
 
       :error ->
-        {:ok, nil,
-         add_error(parser, "could not parse #{Token.literal(parser.cur_token)} as integer")}
+        {nil, add_error(parser, "could not parse #{Token.literal(parser.cur_token)} as integer")}
     end
   end
 
@@ -151,10 +145,10 @@ defmodule Monkey.Parser do
       right: exp
     }
 
-    {:ok, prefix, parser}
+    {prefix, parser}
   end
 
   defp parse_prefix_expression(parser, type) do
-    {:ok, nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
+    {nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
   end
 end
