@@ -84,4 +84,23 @@ defmodule Monkey.ParserTest do
              }
            ] = program.statements
   end
+
+  test "identifier expressions" do
+    # GIVEN
+    input = "foobar;"
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert length(program.statements) == 1
+
+    assert [
+             %AST.ExpressionStatement{
+               expression: %AST.Identifier{
+                 value: "foobar"
+               }
+             }
+           ] = program.statements
+  end
 end

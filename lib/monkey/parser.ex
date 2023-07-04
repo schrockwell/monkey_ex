@@ -8,6 +8,16 @@ defmodule Monkey.Parser do
   alias Monkey.AST
   alias Monkey.Token
 
+  @precedences %{
+    lowest: 0,
+    equals: 1,
+    less_greater: 2,
+    sum: 3,
+    product: 4,
+    prefix: 5,
+    call: 6
+  }
+
   def new(token_stream) do
     %__MODULE__{
       stream: token_stream
@@ -56,11 +66,29 @@ defmodule Monkey.Parser do
     {return, parser}
   end
 
-  defp parse_statement(parser), do: {nil, parser}
+  # expression
+  defp parse_statement(%{cur_token: token} = parser) do
+    {exp, parser} = parse_expression(parser, :lowest)
+    statement = %AST.ExpressionStatement{token: token, expression: exp}
+    parser = optional_semicolon(parser)
+    {statement, parser}
+  end
+
+  defp parse_expression(parser, precedence) do
+    with {:ok, exp, parser} <- parse_prefix_expression(parser, Token.type(parser.cur_token)) do
+      {exp, parser}
+    else
+      :error ->
+        {nil, parser}
+    end
+  end
 
   # Temporary until we can parse expressions
   defp skip_to_semicolon(%{cur_token: {:semicolon, _}} = parser), do: parser
   defp skip_to_semicolon(parser), do: parser |> next_token() |> skip_to_semicolon()
+
+  defp optional_semicolon(%{peek_token: {:semicolon, _}} = parser), do: next_token(parser)
+  defp optional_semicolon(parser), do: parser
 
   defp next_token(parser) do
     cur_token = parser.peek_token
@@ -80,11 +108,23 @@ defmodule Monkey.Parser do
   defp expect_peek(parser, type), do: {:error, peek_error(parser, type)}
 
   defp peek_error(parser, type) do
-    message =
+    add_error(
+      parser,
       "expected next token to be #{inspect(type)}, got #{inspect(Token.type(parser.peek_token))}"
+    )
+  end
 
+  defp add_error(parser, message) do
     %{parser | errors: parser.errors ++ [message]}
   end
 
-  # defp parse_statement(parser, {:let, _})
+  defp parse_prefix_expression(parser, :ident) do
+    {
+      :ok,
+      %AST.Identifier{token: parser.cur_token, value: Token.literal(parser.cur_token)},
+      parser
+    }
+  end
+
+  defp parse_prefix_expression(_parser, _type), do: :error
 end
