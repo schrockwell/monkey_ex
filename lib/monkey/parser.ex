@@ -68,18 +68,17 @@ defmodule Monkey.Parser do
 
   # expression
   defp parse_statement(%{cur_token: token} = parser) do
-    {exp, parser} = parse_expression(parser, :lowest)
+    {exp, parser} = parse_expression(parser)
     statement = %AST.ExpressionStatement{token: token, expression: exp}
     parser = optional_semicolon(parser)
     {statement, parser}
   end
 
-  defp parse_expression(parser, precedence) do
+  defp parse_expression(parser, precedence \\ :lowest) do
     with {:ok, exp, parser} <- parse_prefix_expression(parser, Token.type(parser.cur_token)) do
       {exp, parser}
     else
-      :error ->
-        {nil, parser}
+      :error -> {nil, parser}
     end
   end
 
@@ -98,26 +97,23 @@ defmodule Monkey.Parser do
     %{parser | cur_token: cur_token, peek_token: peek_token, stream: stream}
   end
 
-  # defp cur_token_is?(%{cur_token: {type, _}}, type), do: true
-  # defp cur_token_is?(_, _type), do: false
-
-  # defp peek_token_is?(%{peek_token: {type, _}}, type), do: true
-  # defp peek_token_is?(_, _type), do: false
-
   defp expect_peek(%{peek_token: {type, _}} = parser, type), do: {:ok, next_token(parser)}
-  defp expect_peek(parser, type), do: {:error, peek_error(parser, type)}
 
-  defp peek_error(parser, type) do
-    add_error(
-      parser,
-      "expected next token to be #{inspect(type)}, got #{inspect(Token.type(parser.peek_token))}"
-    )
+  defp expect_peek(parser, type) do
+    parser =
+      add_error(
+        parser,
+        "expected next token to be #{inspect(type)}, got #{inspect(Token.type(parser.peek_token))}"
+      )
+
+    {:error, parser}
   end
 
   defp add_error(parser, message) do
     %{parser | errors: parser.errors ++ [message]}
   end
 
+  # identifiers
   defp parse_prefix_expression(parser, :ident) do
     {
       :ok,
@@ -126,6 +122,7 @@ defmodule Monkey.Parser do
     }
   end
 
+  # integer literals
   defp parse_prefix_expression(parser, :int) do
     case parser.cur_token |> Token.literal() |> Integer.parse() do
       {int, _} ->
@@ -144,5 +141,20 @@ defmodule Monkey.Parser do
     end
   end
 
-  defp parse_prefix_expression(_parser, _type), do: :error
+  # bang, minus
+  defp parse_prefix_expression(%{cur_token: token} = parser, op) when op in [:bang, :minus] do
+    {exp, parser} = parser |> next_token() |> parse_expression()
+
+    prefix = %AST.PrefixExpression{
+      token: token,
+      operator: Token.literal(token),
+      right: exp
+    }
+
+    {:ok, prefix, parser}
+  end
+
+  defp parse_prefix_expression(parser, type) do
+    {:ok, nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
+  end
 end

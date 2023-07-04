@@ -122,4 +122,34 @@ defmodule Monkey.ParserTest do
              }
            ] = program.statements
   end
+
+  test "prefix expressions" do
+    # GIVEN
+    tests = [
+      %{input: "!5", operator: "!", value: 5},
+      %{input: "-15", operator: "-", value: 15}
+    ]
+
+    # WHEN
+    results =
+      Enum.map(tests, fn test ->
+        Map.put(test, :program, parse_program(test.input))
+      end)
+
+    # THEN
+    for %{operator: operator, value: value, program: program} <- results do
+      assert length(program.statements) == 1
+
+      assert [
+               %AST.ExpressionStatement{
+                 expression: %AST.PrefixExpression{
+                   operator: ^operator,
+                   right: %AST.IntegerLiteral{
+                     value: ^value
+                   }
+                 }
+               }
+             ] = program.statements
+    end
+  end
 end
