@@ -126,5 +126,23 @@ defmodule Monkey.Parser do
     }
   end
 
+  defp parse_prefix_expression(parser, :int) do
+    case parser.cur_token |> Token.literal() |> Integer.parse() do
+      {int, _} ->
+        {
+          :ok,
+          %AST.IntegerLiteral{
+            token: parser.cur_token,
+            value: int
+          },
+          parser
+        }
+
+      :error ->
+        {:ok, nil,
+         add_error(parser, "could not parse #{Token.literal(parser.cur_token)} as integer")}
+    end
+  end
+
   defp parse_prefix_expression(_parser, _type), do: :error
 end

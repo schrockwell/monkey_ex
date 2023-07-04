@@ -103,4 +103,23 @@ defmodule Monkey.ParserTest do
              }
            ] = program.statements
   end
+
+  test "integer literals" do
+    # GIVEN
+    input = "5;"
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert length(program.statements) == 1
+
+    assert [
+             %AST.ExpressionStatement{
+               expression: %AST.IntegerLiteral{
+                 value: 5
+               }
+             }
+           ] = program.statements
+  end
 end
