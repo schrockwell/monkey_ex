@@ -36,6 +36,7 @@ defmodule Monkey.Parser do
     end
   end
 
+  # let
   defp parse_statement(%{cur_token: {:let, _} = let_token} = parser) do
     with {:ok, parser} <- expect_peek(parser, :ident),
          name = %AST.Identifier{token: parser.cur_token, value: Token.literal(parser.cur_token)},
@@ -45,6 +46,14 @@ defmodule Monkey.Parser do
     else
       {:error, %__MODULE__{} = parser} -> {nil, parser}
     end
+  end
+
+  # return
+  defp parse_statement(%{cur_token: {:return, _} = return_token} = parser) do
+    # TODO: expression parsing
+    return = %AST.ReturnStatement{token: return_token}
+    parser = parser |> next_token() |> skip_to_semicolon()
+    {return, parser}
   end
 
   defp parse_statement(parser), do: {nil, parser}

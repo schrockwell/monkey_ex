@@ -54,4 +54,34 @@ defmodule Monkey.ParserTest do
              }
            ] = program.statements
   end
+
+  test "parsing return statements" do
+    # GIVEN
+    input = """
+    return 5;
+    return 10;
+    return 838383;
+    """
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert length(program.statements) == 3
+
+    assert [
+             %AST.ReturnStatement{
+               #  return_value: %Monkey.AST.Identifier{token: {:ident, "x"}, value: "x"},
+               token: {:return, "return"}
+             },
+             %AST.ReturnStatement{
+               #  return_value: %Monkey.AST.Identifier{token: {:ident, "y"}, value: "y"},
+               token: {:return, "return"}
+             },
+             %AST.ReturnStatement{
+               #  return_value: %Monkey.AST.Identifier{token: {:ident, "foobar"}, value: "foobar"},
+               token: {:return, "return"}
+             }
+           ] = program.statements
+  end
 end
