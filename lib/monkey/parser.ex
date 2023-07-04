@@ -2,7 +2,8 @@ defmodule Monkey.Parser do
   defstruct stream: nil,
             cur_token: nil,
             peek_token: nil,
-            program: %Monkey.AST.Program{}
+            program: %Monkey.AST.Program{},
+            errors: []
 
   alias Monkey.AST
   alias Monkey.Token
@@ -16,8 +17,7 @@ defmodule Monkey.Parser do
   end
 
   def parse_program(parser) do
-    parser = parse_statements(parser)
-    parser.program
+    parse_statements(parser)
   end
 
   defp parse_statements(%{cur_token: {:eof, _}} = parser), do: parser
@@ -40,7 +40,7 @@ defmodule Monkey.Parser do
     with {:ok, parser} <- expect_peek(parser, :ident),
          name = %AST.Identifier{token: parser.cur_token, value: Token.literal(parser.cur_token)},
          {:ok, parser} <- expect_peek(parser, :assign),
-         parser <- skip_to_semicolon(parser) do
+         parser = skip_to_semicolon(parser) do
       {%AST.LetStatement{token: let_token, name: name}, parser}
     else
       {:error, %__MODULE__{} = parser} -> {nil, parser}
@@ -61,14 +61,21 @@ defmodule Monkey.Parser do
     %{parser | cur_token: cur_token, peek_token: peek_token, stream: stream}
   end
 
-  defp cur_token_is?(%{cur_token: {type, _}}, type), do: true
-  defp cur_token_is?(_, _type), do: false
+  # defp cur_token_is?(%{cur_token: {type, _}}, type), do: true
+  # defp cur_token_is?(_, _type), do: false
 
-  defp peek_token_is?(%{peek_token: {type, _}}, type), do: true
-  defp peek_token_is?(_, _type), do: false
+  # defp peek_token_is?(%{peek_token: {type, _}}, type), do: true
+  # defp peek_token_is?(_, _type), do: false
 
   defp expect_peek(%{peek_token: {type, _}} = parser, type), do: {:ok, next_token(parser)}
-  defp expect_peek(parser, _type), do: {:error, parser}
+  defp expect_peek(parser, type), do: {:error, peek_error(parser, type)}
+
+  defp peek_error(parser, type) do
+    message =
+      "expected next token to be #{inspect(type)}, got #{inspect(Token.type(parser.peek_token))}"
+
+    %{parser | errors: parser.errors ++ [message]}
+  end
 
   # defp parse_statement(parser, {:let, _})
 end

@@ -10,6 +10,19 @@ defmodule Monkey.ParserTest do
     |> Lexer.stream_tokens()
     |> Parser.new()
     |> Parser.parse_program()
+    |> case do
+      %{errors: []} = parser ->
+        parser.program
+
+      %{errors: errors} ->
+        message = """
+        Parser has #{length(errors)} errors:
+
+        #{errors |> Enum.map(&"  - #{&1}") |> Enum.join("\n")}
+        """
+
+        flunk(message)
+    end
   end
 
   test "parsing let statements" do
