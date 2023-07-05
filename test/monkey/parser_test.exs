@@ -152,4 +152,69 @@ defmodule Monkey.ParserTest do
              ] = program.statements
     end
   end
+
+  test "infix expressions" do
+    # GIVEN
+    tests = [
+      %{input: "5 + 6;", left: 5, operator: "+", right: 6},
+      %{input: "5 - 5;", left: 5, operator: "-", right: 5},
+      %{input: "5 * 5;", left: 5, operator: "*", right: 5},
+      %{input: "5 / 5;", left: 5, operator: "/", right: 5},
+      %{input: "5 > 5;", left: 5, operator: ">", right: 5},
+      %{input: "5 < 5;", left: 5, operator: "<", right: 5},
+      %{input: "5 == 5;", left: 5, operator: "==", right: 5},
+      %{input: "5 != 5;", left: 5, operator: "!=", right: 5}
+    ]
+
+    # WHEN
+    results =
+      for test <- tests do
+        Map.put(test, :program, parse_program(test.input))
+      end
+
+    # THEN
+    for %{left: left, operator: operator, right: right, program: program} <- results do
+      assert length(program.statements) == 1
+
+      assert [
+               %AST.ExpressionStatement{
+                 expression: %AST.InfixExpression{
+                   left: %AST.IntegerLiteral{value: ^left},
+                   operator: ^operator,
+                   right: %AST.IntegerLiteral{value: ^right}
+                 }
+               }
+             ] = program.statements
+    end
+  end
+
+  test "operator precedence" do
+    # GIVEN
+    tests = [
+      {"-a", "(-a)"},
+      {"-a * b", "((-a) * b)"},
+      {"!-a", "(!(-a))"},
+      {"a + b + c", "((a + b) + c)"},
+      {"a + b - c", "((a + b) - c)"},
+      {"a * b * c", "((a * b) * c)"},
+      {"a * b / c", "((a * b) / c)"},
+      {"a + b / c", "(a + (b / c))"},
+      {"a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"},
+      {"3 + 4; -5 * 5;", "(3 + 4)((-5) * 5)"},
+      {"5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"},
+      {"5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"},
+      {"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"}
+    ]
+
+    # WHEN
+    results =
+      for {input, expected} <- tests do
+        %{input: input, expected: expected, program: parse_program(input)}
+      end
+
+    # THEN
+    for result <- results do
+      assert to_string(result.program) == result.expected
+    end
+  end
 end

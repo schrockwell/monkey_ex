@@ -8,14 +8,23 @@ defmodule Monkey.Parser do
   alias Monkey.AST
   alias Monkey.Token
 
+  @lowest 0
+  @equals 1
+  @less_greater 2
+  @sum 3
+  @product 4
+  @prefix 5
+  @call 6
+
   @precedences %{
-    lowest: 0,
-    equals: 1,
-    less_greater: 2,
-    sum: 3,
-    product: 4,
-    prefix: 5,
-    call: 6
+    eq: @equals,
+    not_eq: @equals,
+    lt: @less_greater,
+    gt: @less_greater,
+    plus: @sum,
+    minus: @sum,
+    slash: @product,
+    asterisk: @product
   }
 
   def new(token_stream) do
@@ -74,9 +83,35 @@ defmodule Monkey.Parser do
     {statement, parser}
   end
 
-  defp parse_expression(parser, precedence \\ :lowest) do
-    {exp, parser} = parse_prefix_expression(parser, Token.type(parser.cur_token))
-    {exp, parser}
+  defp parse_expression(parser, precedence \\ @lowest) do
+    {left, parser} = parse_prefix_expression(parser, Token.type(parser.cur_token))
+
+    if left do
+      parse_infix_loop(parser, precedence, left)
+    else
+      {nil, parser}
+    end
+  end
+
+  defp parse_infix_loop(%{peek_token: peek} = parser, precedence, left) do
+    if Token.type(peek) != :semicolon and precedence < peek_precedence(parser) do
+      if infix_fn = infix_parse_fn(Token.type(peek)) do
+        # Advance token
+        parser = next_token(parser)
+
+        # Parse the infix expression
+        {infix, parser} = infix_fn.(parser, left)
+
+        # Iterate
+        parse_infix_loop(parser, precedence, infix)
+      else
+        # If next token is not an infix operator, we're done
+        {left, parser}
+      end
+    else
+      # If precedence is too high, or reached a semicolon, we're done
+      {left, parser}
+    end
   end
 
   # Temporary until we can parse expressions
@@ -137,7 +172,7 @@ defmodule Monkey.Parser do
 
   # bang, minus
   defp parse_prefix_expression(%{cur_token: token} = parser, op) when op in [:bang, :minus] do
-    {exp, parser} = parser |> next_token() |> parse_expression()
+    {exp, parser} = parser |> next_token() |> parse_expression(@prefix)
 
     prefix = %AST.PrefixExpression{
       token: token,
@@ -151,4 +186,30 @@ defmodule Monkey.Parser do
   defp parse_prefix_expression(parser, type) do
     {nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
   end
+
+  defp parse_infix_expression(%{cur_token: token} = parser, left) do
+    precedence = cur_precedence(parser)
+    parser = next_token(parser)
+    {right, parser} = parse_expression(parser, precedence)
+
+    {%AST.InfixExpression{
+       token: token,
+       left: left,
+       operator: Token.literal(token),
+       right: right
+     }, parser}
+  end
+
+  defp cur_precedence(%{cur_token: {type, _}}), do: Map.get(@precedences, type, @lowest)
+  defp cur_precedence(_parser), do: @lowest
+
+  defp peek_precedence(%{peek_token: {type, _}}), do: Map.get(@precedences, type, @lowest)
+  defp peek_precedence(_parser), do: @lowest
+
+  defp infix_parse_fn(type)
+       when type in [:plus, :minus, :slash, :asterisk, :eq, :not_eq, :lt, :gt] do
+    &parse_infix_expression/2
+  end
+
+  defp infix_parse_fn(_), do: nil
 end
