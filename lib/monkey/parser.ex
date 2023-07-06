@@ -218,8 +218,69 @@ defmodule Monkey.Parser do
     end
   end
 
+  defp parse_prefix_expression(%{cur_token: token} = parser, :function) do
+    with {:ok, parser} <- expect_peek(parser, :lparen),
+         {params, parser} = parse_function_parameters(parser),
+         {:ok, parser} <- expect_peek(parser, :lbrace),
+         {body, parser} = parse_block_statement(parser) do
+      {%AST.FunctionLiteral{
+         token: token,
+         parameters: params,
+         body: body
+       }, parser}
+    end
+  end
+
   defp parse_prefix_expression(parser, type) do
     {nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
+  end
+
+  defp parse_function_parameters(parser, identifiers \\ [])
+
+  defp parse_function_parameters(%{cur_token: {:lparen, _}} = parser, identifiers) do
+    parser
+    |> next_token()
+    |> parse_function_parameters(identifiers)
+  end
+
+  defp parse_function_parameters(
+         %{
+           cur_token: {:ident, literal} = token,
+           peek_token: {:comma, _}
+         } = parser,
+         identifiers
+       ) do
+    ident = %AST.Identifier{token: token, value: literal}
+
+    parser
+    |> next_token()
+    |> next_token()
+    |> parse_function_parameters([ident | identifiers])
+  end
+
+  defp parse_function_parameters(
+         %{
+           cur_token: {:rparen, _}
+         } = parser,
+         []
+       ) do
+    {[], parser}
+  end
+
+  defp parse_function_parameters(
+         %{
+           cur_token: {:ident, literal} = token,
+           peek_token: {:rparen, _}
+         } = parser,
+         identifiers
+       ) do
+    ident = %AST.Identifier{token: token, value: literal}
+
+    {Enum.reverse([ident | identifiers]), next_token(parser)}
+  end
+
+  defp parse_function_parameters(%{cur_token: {type, _}} = parser, _identifiers) do
+    {nil, add_error(parser, "unexpected #{type} token parsing params")}
   end
 
   defp parse_if_block(parser) do

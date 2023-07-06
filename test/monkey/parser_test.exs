@@ -300,6 +300,67 @@ defmodule Monkey.ParserTest do
            } = alternative
   end
 
+  test "function literals" do
+    # GIVEN
+    input = "fn(x, y) { x + y; }"
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert [
+             %Monkey.AST.ExpressionStatement{
+               expression: %Monkey.AST.FunctionLiteral{
+                 parameters: [
+                   %Monkey.AST.Identifier{value: "x"},
+                   %Monkey.AST.Identifier{value: "y"}
+                 ],
+                 body: %Monkey.AST.BlockStatement{
+                   statements: [
+                     %Monkey.AST.ExpressionStatement{
+                       expression: %Monkey.AST.InfixExpression{
+                         left: %Monkey.AST.Identifier{value: "x"},
+                         operator: "+",
+                         right: %Monkey.AST.Identifier{value: "y"}
+                       }
+                     }
+                   ]
+                 }
+               }
+             }
+           ] = program.statements
+  end
+
+  test "function params parsing" do
+    # GIVEN
+    tests = [
+      {"fn() {};", []},
+      {"fn(x) {};", ["x"]},
+      {"fn(x, y, z) {};", ["x", "y", "z"]}
+    ]
+
+    # WHEN
+    results =
+      for {input, expected} <- tests do
+        %{input: input, expected: expected, program: parse_program(input)}
+      end
+
+    # THEN
+    for %{program: program, expected: expected} <- results do
+      assert [
+               %Monkey.AST.ExpressionStatement{
+                 expression: %Monkey.AST.FunctionLiteral{
+                   parameters: parameters,
+                   body: %Monkey.AST.BlockStatement{statements: []}
+                 }
+               }
+             ] = program.statements
+
+      actual = Enum.map(parameters, & &1.value)
+      assert expected == actual
+    end
+  end
+
   defp assert_literal(expression, expected) when is_binary(expected) do
     assert %AST.Identifier{value: ^expected} = expression
     assert Node.token_literal(expression) == expected
