@@ -2,6 +2,7 @@ defmodule Monkey.ParserTest do
   use ExUnit.Case
 
   alias Monkey.AST
+  alias Monkey.AST.Node
   alias Monkey.Lexer
   alias Monkey.Parser
 
@@ -113,14 +114,7 @@ defmodule Monkey.ParserTest do
 
     # THEN
     assert length(program.statements) == 1
-
-    assert [
-             %AST.ExpressionStatement{
-               expression: %AST.IntegerLiteral{
-                 value: 5
-               }
-             }
-           ] = program.statements
+    assert_literal(hd(program.statements).expression, 5)
   end
 
   test "prefix expressions" do
@@ -176,15 +170,7 @@ defmodule Monkey.ParserTest do
     for %{left: left, operator: operator, right: right, program: program} <- results do
       assert length(program.statements) == 1
 
-      assert [
-               %AST.ExpressionStatement{
-                 expression: %AST.InfixExpression{
-                   left: %AST.IntegerLiteral{value: ^left},
-                   operator: ^operator,
-                   right: %AST.IntegerLiteral{value: ^right}
-                 }
-               }
-             ] = program.statements
+      assert_infix(hd(program.statements).expression, left, operator, right)
     end
   end
 
@@ -216,5 +202,21 @@ defmodule Monkey.ParserTest do
     for result <- results do
       assert to_string(result.program) == result.expected
     end
+  end
+
+  defp assert_literal(expression, expected) when is_binary(expected) do
+    assert %AST.Identifier{value: ^expected} = expression
+    assert Node.token_literal(expression) == expected
+  end
+
+  defp assert_literal(expression, expected) when is_integer(expected) do
+    assert %AST.IntegerLiteral{value: ^expected} = expression
+    assert Node.token_literal(expression) == to_string(expected)
+  end
+
+  defp assert_infix(%AST.InfixExpression{} = infix, left, operator, right) do
+    assert_literal(infix.left, left)
+    assert infix.operator == operator
+    assert_literal(infix.right, right)
   end
 end
