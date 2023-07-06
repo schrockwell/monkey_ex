@@ -170,6 +170,11 @@ defmodule Monkey.Parser do
     end
   end
 
+  # booleans
+  defp parse_prefix_expression(parser, bool) when is_boolean(bool) do
+    {%AST.Boolean{token: parser.cur_token, value: bool}, parser}
+  end
+
   # bang, minus
   defp parse_prefix_expression(%{cur_token: token} = parser, op) when op in [:bang, :minus] do
     {exp, parser} = parser |> next_token() |> parse_expression(@prefix)

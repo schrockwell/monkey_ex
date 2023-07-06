@@ -121,7 +121,9 @@ defmodule Monkey.ParserTest do
     # GIVEN
     tests = [
       %{input: "!5", operator: "!", value: 5},
-      %{input: "-15", operator: "-", value: 15}
+      %{input: "-15", operator: "-", value: 15},
+      %{input: "!true;", operator: "!", value: true},
+      %{input: "!false", operator: "!", value: false}
     ]
 
     # WHEN
@@ -133,17 +135,7 @@ defmodule Monkey.ParserTest do
     # THEN
     for %{operator: operator, value: value, program: program} <- results do
       assert length(program.statements) == 1
-
-      assert [
-               %AST.ExpressionStatement{
-                 expression: %AST.PrefixExpression{
-                   operator: ^operator,
-                   right: %AST.IntegerLiteral{
-                     value: ^value
-                   }
-                 }
-               }
-             ] = program.statements
+      assert_prefix(hd(program.statements).expression, operator, value)
     end
   end
 
@@ -157,7 +149,10 @@ defmodule Monkey.ParserTest do
       %{input: "5 > 5;", left: 5, operator: ">", right: 5},
       %{input: "5 < 5;", left: 5, operator: "<", right: 5},
       %{input: "5 == 5;", left: 5, operator: "==", right: 5},
-      %{input: "5 != 5;", left: 5, operator: "!=", right: 5}
+      %{input: "5 != 5;", left: 5, operator: "!=", right: 5},
+      %{input: "true == true", left: true, operator: "==", right: true},
+      %{input: "true != false", left: true, operator: "!=", right: false},
+      %{input: "false == false", left: false, operator: "==", right: false}
     ]
 
     # WHEN
@@ -189,7 +184,11 @@ defmodule Monkey.ParserTest do
       {"3 + 4; -5 * 5;", "(3 + 4)((-5) * 5)"},
       {"5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"},
       {"5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"},
-      {"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"}
+      {"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"},
+      {"true", "true"},
+      {"false", "false"},
+      {"3 > 5 == false", "((3 > 5) == false)"},
+      {"3 < 5 ==  true", "((3 < 5) == true)"}
     ]
 
     # WHEN
@@ -204,6 +203,26 @@ defmodule Monkey.ParserTest do
     end
   end
 
+  test "boolean expressions" do
+    # GIVEN
+    inputs = [
+      {"true;", true},
+      {"false;", false}
+    ]
+
+    # WHEN
+    results =
+      for {input, expected} <- inputs do
+        %{input: input, expected: expected, program: parse_program(input)}
+      end
+
+    # THEN
+    for %{expected: expected, program: program} <- results do
+      assert length(program.statements) == 1
+      assert_literal(hd(program.statements).expression, expected)
+    end
+  end
+
   defp assert_literal(expression, expected) when is_binary(expected) do
     assert %AST.Identifier{value: ^expected} = expression
     assert Node.token_literal(expression) == expected
@@ -212,6 +231,16 @@ defmodule Monkey.ParserTest do
   defp assert_literal(expression, expected) when is_integer(expected) do
     assert %AST.IntegerLiteral{value: ^expected} = expression
     assert Node.token_literal(expression) == to_string(expected)
+  end
+
+  defp assert_literal(expression, expected) when is_boolean(expected) do
+    assert %AST.Boolean{value: ^expected} = expression
+    assert Node.token_literal(expression) == to_string(expected)
+  end
+
+  defp assert_prefix(%AST.PrefixExpression{} = prefix, operator, right) do
+    assert prefix.operator == operator
+    assert_literal(prefix.right, right)
   end
 
   defp assert_infix(%AST.InfixExpression{} = infix, left, operator, right) do
