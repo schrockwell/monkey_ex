@@ -188,6 +188,17 @@ defmodule Monkey.Parser do
     {prefix, parser}
   end
 
+  # grouped expressions (parens)
+  defp parse_prefix_expression(parser, :lparen) do
+    parser = next_token(parser)
+    {expression, parser} = parse_expression(parser)
+
+    case expect_peek(parser, :rparen) do
+      {:ok, parser} -> {expression, parser}
+      {:error, parser} -> {nil, parser}
+    end
+  end
+
   defp parse_prefix_expression(parser, type) do
     {nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
   end
