@@ -59,7 +59,7 @@ defmodule Monkey.Lexer do
     {identifier, rest} = Enum.split_while(chars, &(&1 in @letters))
     identifier = Enum.join(identifier)
 
-    type = @keywords[identifier] || :ident
+    type = Map.get(@keywords, identifier, :ident)
 
     {[{type, identifier}], rest}
   end

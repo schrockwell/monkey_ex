@@ -89,7 +89,7 @@ defmodule Monkey.LexerTest do
       else: "else",
       lbrace: "{",
       return: "return",
-      ident: "false",
+      false: "false",
       semicolon: ";",
       rbrace: "}",
       int: "10",
