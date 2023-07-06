@@ -199,8 +199,80 @@ defmodule Monkey.Parser do
     end
   end
 
+  # if statements
+  defp parse_prefix_expression(parser, :if) do
+    with {:ok, condition, consequence, parser} <- parse_if_block(parser) do
+      case parse_else_block(parser) do
+        {:ok, alternative, parser} ->
+          {%AST.IfExpression{
+             condition: condition,
+             consequence: consequence,
+             alternative: alternative
+           }, parser}
+
+        {:error, parser} ->
+          {nil, parser}
+      end
+    else
+      {:error, parser} -> {nil, parser}
+    end
+  end
+
   defp parse_prefix_expression(parser, type) do
     {nil, add_error(parser, "no prefix parse fn for #{inspect(type)}")}
+  end
+
+  defp parse_if_block(parser) do
+    with {:ok, parser} <- expect_peek(parser, :lparen),
+         {condition, parser} = parser |> next_token() |> parse_expression(),
+         {:ok, parser} <- expect_peek(parser, :rparen),
+         {:ok, parser} <- expect_peek(parser, :lbrace),
+         {consequence, parser} = parse_block_statement(parser) do
+      {:ok, condition, consequence, parser}
+    else
+      {:error, parser} -> {:error, parser}
+    end
+  end
+
+  defp parse_else_block(%{peek_token: {:else, _}} = parser) do
+    parser
+    |> next_token()
+    |> expect_peek(:lbrace)
+    |> case do
+      {:ok, parser} ->
+        {block, parser} = parse_block_statement(parser)
+        {:ok, block, parser}
+
+      {:error, parser} ->
+        {:error, parser}
+    end
+  end
+
+  defp parse_else_block(parser), do: {:ok, nil, parser}
+
+  defp parse_block_statement(parser) do
+    block = %AST.BlockStatement{statements: [], token: parser.cur_token}
+    parser |> next_token() |> parse_block_statement(block)
+  end
+
+  defp parse_block_statement(%{cur_token: {type, _}} = parser, block)
+       when type in [:rbrace, :eof] do
+    {%{block | statements: Enum.reverse(block.statements)}, parser}
+  end
+
+  defp parse_block_statement(parser, block) do
+    {block, parser} =
+      case parse_statement(parser) do
+        {nil, parser} ->
+          {block, parser}
+
+        {statement, parser} ->
+          {%{block | statements: [statement | block.statements]}, parser}
+      end
+
+    parser
+    |> next_token()
+    |> parse_block_statement(block)
   end
 
   defp parse_infix_expression(%{cur_token: token} = parser, left) do

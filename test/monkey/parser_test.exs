@@ -228,6 +228,78 @@ defmodule Monkey.ParserTest do
     end
   end
 
+  test "if expressions" do
+    # GIVEN
+    input = "if (x < y) { x }"
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert length(program.statements) == 1
+
+    assert [
+             %AST.ExpressionStatement{
+               expression: %AST.IfExpression{
+                 condition: condition,
+                 consequence: consequence,
+                 alternative: alternative
+               }
+             }
+           ] = program.statements
+
+    assert_infix(condition, "x", "<", "y")
+
+    assert %Monkey.AST.BlockStatement{
+             statements: [
+               %Monkey.AST.ExpressionStatement{
+                 expression: %Monkey.AST.Identifier{value: "x"}
+               }
+             ]
+           } = consequence
+
+    assert alternative == nil
+  end
+
+  test "if-else expressions" do
+    # GIVEN
+    input = "if (x < y) { x } else { y }"
+
+    # WHEN
+    program = parse_program(input)
+
+    # THEN
+    assert length(program.statements) == 1
+
+    assert [
+             %AST.ExpressionStatement{
+               expression: %AST.IfExpression{
+                 condition: condition,
+                 consequence: consequence,
+                 alternative: alternative
+               }
+             }
+           ] = program.statements
+
+    assert_infix(condition, "x", "<", "y")
+
+    assert %Monkey.AST.BlockStatement{
+             statements: [
+               %Monkey.AST.ExpressionStatement{
+                 expression: %Monkey.AST.Identifier{value: "x"}
+               }
+             ]
+           } = consequence
+
+    assert %Monkey.AST.BlockStatement{
+             statements: [
+               %Monkey.AST.ExpressionStatement{
+                 expression: %Monkey.AST.Identifier{value: "y"}
+               }
+             ]
+           } = alternative
+  end
+
   defp assert_literal(expression, expected) when is_binary(expected) do
     assert %AST.Identifier{value: ^expected} = expression
     assert Node.token_literal(expression) == expected
